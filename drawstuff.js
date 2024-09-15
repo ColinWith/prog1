@@ -110,7 +110,7 @@ function getInputEllipsoids() {
 //get the input triangles from the standard class URL
 function getInputTriangles() {
     const INPUT_TRIANGLES_URL = 
-        "https://ncsucgclass.github.io/prog1/triangles.json";
+        "https://ncsucgclass.github.io/prog1/triangles2.json";
         
     // load the triangles file
     var httpReq = new XMLHttpRequest(); // a new http request
@@ -318,6 +318,381 @@ function drawRandPixelsInInputTriangles(context) {
     } // end if triangle file found
 } // end draw rand pixels in input triangles
 
+/**
+ * Calculates the ambient vector from the given values
+ * @param Ka reflectivity coefficient
+ * @param La color
+ * @returns ambient vector
+ */
+function ambient(Ka, La) {
+    return Ka * La;
+}
+/** 
+ * Calculates the Diffuse vector from the given values
+ * @param Kd reflectivity coefficient
+ * @param Ld color
+ * @param N normal vector
+ * @param L light vector
+ * @returns diffuse vector
+ */
+function diffuse(Kd, Ld, N, L) {
+    return Kd * Ld * vector3D_DotProduct(vector3D_Normalise(N), vector3D_Normalise(L));
+}
+/**
+ * Calculates the Spectular vector from the given values
+ * @param Ks reflectivity coefficient
+ * @param Ls color
+ * @param R reflection vector
+ * @param V view point vector
+ * @param a reflectivity exponent
+ * @returns specular vector
+ */
+function spectular(Ks, Ls, R, V, a) {
+    return Ks * Ls * Math.pow(vector3D_DotProduct(vector3D_Normalise(R), vector3D_Normalise(V)), a);
+}
+/** 
+ * Calculates the Reflection vector from the given values
+ * @param L light direction vector
+ * @param N normal vector
+ * @returns reflection vector
+ */
+function reflection(L, N) {
+    return vector3D_Subtract(vector3D_MultConst(N, 2.0 * vector3D_DotProduct(vector3D_Normalise(L), vector3D_Normalise(N))), L );
+}
+
+/**
+ * Calculates the color of a vertex from the given parameters
+ * @param {any} Ka
+ * @param {any} La
+ * @param {any} Kd
+ * @param {any} Ld
+ * @param {any} N
+ * @param {any} L
+ * @param {any} Ks
+ * @param {any} Ls
+ * @param {any} V
+ * @param {any} a
+ */
+function vertexColor(Ka, La, Kd, Ld, N, L, Ks, Ls, V, a) {
+    var R = reflection(L, N);
+    var ambi = ambient(Ka, La);
+    console.log("ambinet: " + ambi);
+    var diff = diffuse(Kd, Ld, N, L);
+    console.log("diffuse: " + diff);
+    var spec = spectular(Ks, Ls, R, V, a);
+    console.log("spectular: " + spec);
+    var col = ambi + diff + spec;
+    console.log("color: " + col);
+    return col;
+}
+
+// Checks if the given point is within the tiangle made up from the given vertices
+function isInTriangle(point, v1, v2, v3) {
+    
+    // plane checking
+    var t1 = ((point[0] - v2[0]) * (v1[1] - v2[1]) - (v1[0] - v2[0]) * (point[1] - v2[1])) < 0.0;
+    var t2 = ((point[0] - v3[0]) * (v2[1] - v3[1]) - (v2[0] - v3[0]) * (point[1] - v3[1])) < 0.0;
+    var t3 = ((point[0] - v1[0]) * (v3[1] - v1[1]) - (v3[0] - v1[0]) * (point[1] - v1[1])) < 0.0;
+
+    if ((t1 == t2) && (t2 == t3)) { // draw the pixel if inside the triangle
+        return true;
+    }
+    return false;
+}
+
+function vector3D_Add(v1, v2) {
+    return [v1[0] + v2[0], v1[1] + v2[1], v1[2] + v2[2]];
+}
+function vector3D_Subtract(v1, v2) {
+    return [v1[0] - v2[0], v1[1] - v2[1], v1[2] - v2[2]];
+}
+function vector3D_MultConst(v, c) {
+    return [v[0] * c, v[1] * c, v[2] * c];
+}
+function vector3D_DivConst(v, c) {
+    return [v[0] / c, v[1] / c, v[2] / c];
+}
+function vector3D_DotProduct(a, b) {
+    var result = 0;
+
+    for (var i = 0; i < 3; i++) {
+        result += a[i] * b[i];
+    }
+
+    return result;
+}
+
+function vector3D_Magnitude(v) {
+    return Math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
+}
+function vector3D_Normalise(v) {
+    return vector3D_DivConst(v, vector3D_Magnitude(v));
+}
+
+// finds cross product between two vector3D's
+function vector3D_CrossProduct(a, b) {
+    return [(a[1] * b[2]) - (a[2] * b[1]),
+            (a[2] * b[0]) - (a[0] * b[2]),
+            (a[0] * b[1]) - (a[1] * b[0])];
+}
+
+function triangleNormal(A, B, C) {
+    return vector3D_CrossProduct(vector3D_Subtract(B, A),
+                                  vector3D_Subtract(C, A));
+}
+
+
+// Takes eye position (E), point (P), and three triangle vectors (v1, v2, v3)
+// and check for  an intersection
+// returns point of intersection if true
+function rayIntersection(E, P, v1, v2, v3) {
+
+    //console.log("E: " + E + ", P: " + P + ", v1: " + v1 + ", v2: " + v2 + ", v3: " + v3);
+    var D = vector3D_Subtract(P, E); // ray direction
+    //console.log("D: " + D);
+    var N = triangleNormal(v1, v2, v3); // triangle normal
+    //console.log("N: " + N);
+    var pd = vector3D_DotProduct(N, v1); // triangle plane coefficient
+    //console.log("pd: " + pd);
+
+    var ND = vector3D_DotProduct(N, D);
+    //console.log("ND: " + ND);
+    if (ND == 0) {
+        return null; // no intersection
+    }
+    else {
+        // does intersect
+        var t = (pd - vector3D_DotProduct(N, E)) / ND; // ray distance to intersection
+        //console.log("t: " + t);
+        // calculate coordinates of intersection
+        var I = vector3D_Add(E, vector3D_MultConst(D, t));
+        //console.log("[INTERSECTION AT] I: " + I[0] + ", " + I[1] + ", " + I[2]);
+        return I;
+    }
+}
+
+
+// draws the input triangles using pixels
+function drawInputTraingles0(context) {
+    var inputTriangles = getInputTriangles();
+    var w = context.canvas.width;
+    var h = context.canvas.height;
+    var imagedata = context.createImageData(w, h);
+    const PIXEL_DENSITY = 0.1;
+    var numCanvasPixels = (w * h) * PIXEL_DENSITY; 
+
+    var eyePos = [0.5, 0.5, -0.5];
+    var viewUpVec = [0, 1, 0];
+    var lookAtVec = [0, 0, 1];
+    var windowDist = 0.5;
+    var windowCent = [0.5, 0.5, 0];
+    var lightPoss = [-3, 1, -0.5];
+
+
+    if (inputTriangles != String.null) {
+        var c = new Color(0, 0, 0, 0); // the color at the pixel: black
+        var cb = new Color(0, 0, 0, 255); // the color for empty pixels: black
+        var w = context.canvas.width;
+        var h = context.canvas.height;
+        var n = inputTriangles.length;
+        console.log("number of files: " + n);
+
+        // Loop over the input files
+        for (var f = 0; f < n; f++) {
+            var tn = inputTriangles[f].triangles.length;
+            console.log("number of triangles in this files: " + tn);
+
+
+
+            // render each triangle
+            for (var t = 0; t < tn; t++) {
+                var vertex1 = inputTriangles[f].triangles[t][0];
+                var vertex2 = inputTriangles[f].triangles[t][1];
+                var vertex3 = inputTriangles[f].triangles[t][2];
+                //console.log("vertexs: (" + vertex1 + "), (" + vertex2 + "), (" + vertex3 + ")");
+
+                var vertexPos1 = inputTriangles[f].vertices[vertex1];
+                var vertexPos2 = inputTriangles[f].vertices[vertex2];
+                var vertexPos3 = inputTriangles[f].vertices[vertex3];
+                console.log("vertexPos: (" + vertexPos1 + "), (" + vertexPos2 + "), (" + vertexPos3 + ")");
+
+                // triangle position on canvas
+
+                var v1 = [w * vertexPos1[0], h * vertexPos1[1]];
+                var v2 = [w * vertexPos2[0], h * vertexPos2[1]];
+                var v3 = [w * vertexPos3[0], h * vertexPos3[1]];
+                //console.log("v's: (" + v1 + "), (" + v2 + "), (" + v3 + ")");
+
+                c.change(
+                    inputTriangles[f].material.diffuse[0] * 255,
+                    inputTriangles[f].material.diffuse[1] * 255,
+                    inputTriangles[f].material.diffuse[2] * 255,
+                    255); // triangle diffuse color
+
+                var point = [0, 0, 0];
+                var pointLast = [0, 0]; // for testing
+                var intersectionPoint = [0,0,0];
+
+                // goes through each canvas pixel, and only renders those which intersect a pixel
+                for (var y = 0.0; y < h; y++) {
+
+                    for (var x = 0.0; x < w; x++) {
+                        point = [x / w, y / h, 0];
+                        
+                        intersectionPoint = rayIntersection([eyePos[0], eyePos[1], eyePos[2]], point, vertexPos1, vertexPos2, vertexPos3);
+                        if (intersectionPoint != null && isInTriangle([intersectionPoint[0] * w, intersectionPoint[1] * h], v1, v2, v3)) {
+                            
+                            drawPixel(imagedata, x, h - y, c);
+                            pointLast = [x, y];
+                            
+                            //console.log("[HIT] triangle: " + t + ", xy: (" + x + ", " + y + "), c: (" + c.r + "," + c.g + "," + c.b + ")");
+                            
+                            
+                        }
+                        else {
+                            //drawPixel(imagedata, x, h - y, cb);
+                            //console.log("[MISS]");
+                        }
+
+                    }
+                }
+                console.log("rendered triangle from file " + f + ", #" + t + ", last pixel rendered at (" + intersectionPoint[0] + ", " + intersectionPoint[1] + ", " + intersectionPoint[2] + ")");
+            }
+            
+        } // end for files
+        context.putImageData(imagedata, 0, 0);
+    } // end if triangle files found
+} // end draw input triangles
+
+// draws the input triangles using pixels
+function drawInputTraingles(context) {
+    var inputTriangles = getInputTriangles();
+    var w = context.canvas.width;
+    var h = context.canvas.height;
+    var imagedata = context.createImageData(w, h);
+    const PIXEL_DENSITY = 0.1;
+    var numCanvasPixels = (w * h) * PIXEL_DENSITY;
+
+    var eyePos = [0.5, 0.5, -0.5];
+    var viewUpVec = [0, 1, 0];
+    var lookAtVec = [0, 0, 1];
+    var windowDist = 0.5;
+    var windowCent = [0.5, 0.5, 0];
+    var lightPoss = [-3, 1, -0.5];
+
+
+
+
+    if (inputTriangles != String.null) {
+        var c = new Color(0, 0, 0, 0); // the color at the pixel: black
+        var cb = new Color(0, 0, 0, 255); // the color for empty pixels: black
+        var n = inputTriangles.length;
+        console.log("number of files: " + n);
+
+        var point;
+
+        // goes through each canvas pixel, and only renders those which intersect a tiangle
+        for (var y = 0.0; y < h; y++) {
+            for (var x = 0.0; x < w; x++) {
+                point = [x / w, y / h, 0];
+
+                var vertex1;
+                var vertex2;
+                var vertex3;
+
+                var vertexPos1;
+                var vertexPos2;
+                var vertexPos3;
+                // triangle position on canvas
+
+                var v1;
+                var v2;
+                var v3;
+
+                var intersectionPoint;
+                var prevIntersectionPoint = null;
+
+                // Loop over the input files
+                for (var f = 0; f < n; f++) {
+                    var tn = inputTriangles[f].triangles.length;
+                    //console.log("number of triangles in this files: " + tn);
+
+                    // Check each triangle for intersections
+                    for (var t = 0; t < tn; t++) {
+                        vertex1 = inputTriangles[f].triangles[t][0];
+                        vertex2 = inputTriangles[f].triangles[t][1];
+                        vertex3 = inputTriangles[f].triangles[t][2];
+                        //console.log("vertexs: (" + vertex1 + "), (" + vertex2 + "), (" + vertex3 + ")");
+
+                        vertexPos1 = inputTriangles[f].vertices[vertex1];
+                        vertexPos2 = inputTriangles[f].vertices[vertex2];
+                        vertexPos3 = inputTriangles[f].vertices[vertex3];
+                        //console.log("vertexPos: (" + vertexPos1 + "), (" + vertexPos2 + "), (" + vertexPos3 + ")");
+
+                        // triangle position on canvas
+
+                        v1 = [w * vertexPos1[0], h * vertexPos1[1]];
+                        v2 = [w * vertexPos2[0], h * vertexPos2[1]];
+                        v3 = [w * vertexPos3[0], h * vertexPos3[1]];
+                        //console.log("v's: (" + v1 + "), (" + v2 + "), (" + v3 + ")");
+
+                        c.change(
+                            inputTriangles[f].material.diffuse[0] * 255,
+                            inputTriangles[f].material.diffuse[1] * 255,
+                            inputTriangles[f].material.diffuse[2] * 255,
+                            255); // triangle diffuse color
+
+
+
+                        //var newI = rayIntersection([eyePos[0], eyePos[1], eyePos[2]], point, vertexPos1, vertexPos2, vertexPos3);
+                        intersectionPoint = rayIntersection([eyePos[0], eyePos[1], eyePos[2]], point, vertexPos1, vertexPos2, vertexPos3);
+
+
+                        if (intersectionPoint != null && isInTriangle([intersectionPoint[0] * w, intersectionPoint[1] * h], v1, v2, v3)) {
+                            
+                            //if (intersectionPoint == null || newI[2] < intersectionPoint[2]) {
+                            //    intersectionPoint = newI;
+                            //    drawPixel(imagedata, x, y, c);
+                            //}
+                            if (prevIntersectionPoint == null || intersectionPoint[2] < prevIntersectionPoint[2]) {
+                                drawPixel(imagedata, x, h - y, c);
+                            }
+
+                            //drawPixel(imagedata, x, h - y, c);
+
+                            prevIntersectionPoint = intersectionPoint;
+                            //pointLast = [x, y];
+
+                            //console.log("[HIT] triangle: " + t + ", xy: (" + x + ", " + y + "), c: (" + c.r + "," + c.g + "," + c.b + ")");
+
+
+                        }
+                        else {
+                            if (prevIntersectionPoint == null) {
+                                // draw background (black by default)
+                                drawPixel(imagedata, x, h-y, cb);
+                            }
+                            //drawPixel(imagedata, x, y, cb);
+                            //console.log("[MISS]");
+                        }
+
+
+
+                        //console.log("rendered triangle from file " + f + ", #" + t + ", last pixel rendered at (" + intersectionPoint[0] + ", " + intersectionPoint[1] + ", " + intersectionPoint[2] + ")");
+                    }
+
+                } // end for files
+
+       
+                
+            }
+        }
+
+        context.putImageData(imagedata, 0, 0);
+    } // end if triangle files found
+} // end draw input triangles
+
+
 //draw 2d projections traingle from the JSON file at class github
 function drawInputTrainglesUsingPaths(context) {
     var inputTriangles = getInputTriangles();
@@ -469,19 +844,44 @@ function main() {
     // Create the image
     //drawRandPixels(context);
       // shows how to draw pixels
-    
+
     //drawRandPixelsInInputEllipsoids(context);
       // shows how to draw pixels and read input file
-      
+
     //drawInputEllipsoidsUsingArcs(context);
       // shows how to read input file, but not how to draw pixels
-    
+
     //drawRandPixelsInInputTriangles(context);
       // shows how to draw pixels and read input file
-    
-    drawInputTrainglesUsingPaths(context);
+
+    //drawInputTrainglesUsingPaths(context);
       // shows how to read input file, but not how to draw pixels
-    
+
+
+    //drawBackground(context, new Color(0, 0, 0, 255));
+
+    drawInputTraingles(context);
+
+    //vertexColor(0.1, 0.3,
+    //            0.7, 0.4, [0, 1, 0], [1, 1, 0],
+    //            0.2, 0.3, [-1, 1, 0], 2);
+
+    //vertexColor(0.2, 0.1,
+    //            0.6, 0.5, [0, 1, 0], [0.5, 1, 0],
+    //            0.2, 0.2, [-0.5, 1, 0], 3);
+
+
+    //console.log("diffuse: " + diffuse(0.5, 1, [0, 1, 1], [1, 1, 1]));
+
+    //var test1 = vector3D_DotProduct([1, 0, 1], [1, 1, 0]);
+    //console.log("dotProductTest: " + test1);
+    //var test2 = vector3D_CrossProduct([1, 0, 1], [1, 1, 0]);
+    //console.log("crossProductTest: " + test2);
+    //var test3 = vector3D_Add([1, 0, 1], [1, 1, 0]);
+    //console.log("AddTest: " + test3);
+    //var test4 = triangleNormal([1, 0, 1], [1, 1, 0], [3, 2, 1]);
+    //console.log("NormalTest: " + test4);
+
     //drawRandPixelsInInputBoxes(context);
       // shows how to draw pixels and read input file
     

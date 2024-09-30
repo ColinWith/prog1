@@ -4,6 +4,7 @@
 /** number of ray bounces to perform per ray trace */
 var NUMBOUNCES = 0; 
 
+var showCustom = false;
 
 /* classes */ 
 
@@ -925,7 +926,8 @@ function shade(surface, whichBounce, viewPoint, light) {
 
 // draws the input triangles using pixels
 function drawInputTraingles(context) {
-    var inputTriangles = [
+    var inputTriangles = getInputTriangles();
+    var inputTriangles_custom = [
         // pink
         {
             "material": { "ambient": [0.945, 0.706, 0.455], "diffuse": [0.3, 0.3, 0.3], "specular": [0.15, 0.15, 0.15], "n": 6 },
@@ -1051,7 +1053,11 @@ function drawInputTraingles(context) {
         }
     ];
 
-    //inputTriangles = getInputTriangles();
+    if (showCustom) {
+        inputTriangles = inputTriangles_custom;
+    }
+
+    
 
     var w = context.canvas.width;
     var h = context.canvas.height;
@@ -1284,10 +1290,28 @@ function drawInputBoxesUsingPaths(context) {
     } // end if box files found
 } // end draw input boxes
 
+/**
+ * Toggles the shown graphic between 2 versions when 'Space' is pressed
+ * @param {any} evt event data
+ */
+function toggleDisplay(evt) {
+    var canvas = document.getElementById("viewport");
+    var context = canvas.getContext("2d");
+
+    // toggles the showCustom boolean when "Space" is pressed
+    if (evt.code == "Space") {
+        if (showCustom) {
+            showCustom = false;
+        }
+        else {
+            showCustom = true;
+        }
+
+        drawInputTraingles(context);
+    }
+}
 /* main -- here is where execution begins after window load */
-
 function main() {
-
     // Get the canvas and context
     var canvas = document.getElementById("viewport"); 
     var context = canvas.getContext("2d");
@@ -1308,6 +1332,7 @@ function main() {
     //drawInputTrainglesUsingPaths(context);
       // shows how to read input file, but not how to draw pixels
 
+    window.addEventListener("keydown", toggleDisplay, false);
 
     drawInputTraingles(context);
 

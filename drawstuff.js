@@ -1290,8 +1290,10 @@ function drawInputBoxesUsingPaths(context) {
     } // end if box files found
 } // end draw input boxes
 
-/* main -- here is where execution begins after window load */
-
+/**
+ * Toggles the shown graphic between 2 versions when 'Space' is pressed
+ * @param {any} evt event data
+ */
 function toggleDisplay(evt) {
     var canvas = document.getElementById("viewport");
     var context = canvas.getContext("2d");
@@ -1308,7 +1310,7 @@ function toggleDisplay(evt) {
         drawInputTraingles(context);
     }
 }
-
+/* main -- here is where execution begins after window load */
 function main() {
     // Get the canvas and context
     var canvas = document.getElementById("viewport"); 
